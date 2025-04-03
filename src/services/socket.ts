@@ -129,6 +129,13 @@ class SocketService {
     }
     this.socket.emit('chatMessage', payload);
   }
+  
+  public reconnect(playerId: string): void {
+    if (!this.socket) {
+      throw new Error('Socket not initialized. Call connect() first.');
+    }
+    this.socket.emit('reconnect', { playerId });
+  }
 }
 
 // Export a singleton instance

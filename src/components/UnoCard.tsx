@@ -1,124 +1,153 @@
 
 import React from 'react';
-import { Card, CardColor } from '../types/uno';
+import { Card as CardType } from '@/types/uno';
 import { cn } from '@/lib/utils';
 
 interface UnoCardProps {
-  card?: Card;
-  isPlayable?: boolean;
-  onClick?: () => void;
+  card?: CardType;
   isBack?: boolean;
-  className?: string;
   size?: 'sm' | 'md' | 'lg';
-  style?: React.CSSProperties;
-  stackPosition?: number;
+  isPlayable?: boolean;
+  isSelected?: boolean;
+  className?: string;
+  onClick?: () => void;
+  onDoubleClick?: () => void;
 }
 
 const UnoCard: React.FC<UnoCardProps> = ({
   card,
-  isPlayable = false,
-  onClick,
   isBack = false,
-  className,
   size = 'md',
-  style,
-  stackPosition = 0,
+  isPlayable = false,
+  isSelected = false,
+  className = '',
+  onClick,
+  onDoubleClick
 }) => {
-  if (!card && !isBack) {
-    return null;
-  }
-
+  // Size classes
   const sizeClasses = {
-    sm: 'w-12 h-16 text-lg',
-    md: 'w-16 h-24 text-2xl',
-    lg: 'w-20 h-32 text-3xl',
+    sm: "w-10 h-14",
+    md: "w-16 h-24",
+    lg: "w-20 h-30"
   };
-
-  const getCardColorClass = (color: CardColor) => {
-    switch (color) {
-      case 'red':
-        return 'uno-card-red';
-      case 'blue':
-        return 'uno-card-blue';
-      case 'green':
-        return 'uno-card-green';
-      case 'yellow':
-        return 'uno-card-yellow';
-      case 'wild':
-        return 'uno-card-wild';
-      default:
-        return 'uno-card-back';
-    }
+  
+  // Card back design
+  if (isBack) {
+    return (
+      <div 
+        className={cn(
+          "rounded-lg bg-gradient-to-br from-red-600 to-red-800 border-2 border-white shadow-md",
+          sizeClasses[size],
+          className
+        )}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+      >
+        <div className="h-full w-full rounded-md bg-white/10 flex items-center justify-center">
+          <div className="bg-white/90 transform -rotate-12 rounded-full w-3/4 h-1/2 flex items-center justify-center">
+            <span className="font-bold text-red-600 transform rotate-12 text-xl">UNO</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!card) return null;
+  
+  // Colors
+  const colorClasses = {
+    red: "from-red-500 to-red-700 text-white",
+    blue: "from-blue-500 to-blue-700 text-white",
+    green: "from-green-500 to-green-700 text-white",
+    yellow: "from-yellow-400 to-yellow-600 text-black",
+    wild: "from-gray-700 to-black text-white"
   };
-
-  const getCardSymbol = (card: Card) => {
+  
+  const symbolSize = size === 'sm' ? 'text-xl' : size === 'md' ? 'text-3xl' : 'text-4xl';
+  const cornerSize = size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base';
+  
+  const getSymbol = () => {
     switch (card.value) {
       case 'skip':
-        return '⊘';
+        return (
+          <div className="rounded-full border-4 relative">
+            <div className="absolute inset-0 border-t-4 transform rotate-45"></div>
+          </div>
+        );
       case 'reverse':
-        return '⇄';
+        return (
+          <div className="flex">
+            <div className="border-2 border-current w-3 h-3 rounded-full relative">
+              <div className="absolute top-0.5 left-0.5 border-t-2 border-r-2 border-current w-2 h-2 transform rotate-45"></div>
+            </div>
+            <div className="border-2 border-current w-3 h-3 rounded-full relative transform -scale-x-100">
+              <div className="absolute top-0.5 left-0.5 border-t-2 border-r-2 border-current w-2 h-2 transform rotate-45"></div>
+            </div>
+          </div>
+        );
       case 'draw2':
-        return '+2';
+        return "+2";
       case 'wild':
-        return '🌈';
+        return (
+          <div className="flex-1 grid grid-cols-2 gap-1">
+            <div className="bg-red-500 rounded-tl-full"></div>
+            <div className="bg-blue-500 rounded-tr-full"></div>
+            <div className="bg-yellow-400 rounded-bl-full"></div>
+            <div className="bg-green-500 rounded-br-full"></div>
+          </div>
+        );
       case 'wild4':
-        return '+4';
+        return (
+          <div className="flex flex-col">
+            <div className="flex-1 grid grid-cols-2 gap-0.5">
+              <div className="bg-red-500 rounded-tl-full"></div>
+              <div className="bg-blue-500 rounded-tr-full"></div>
+              <div className="bg-yellow-400 rounded-bl-full"></div>
+              <div className="bg-green-500 rounded-br-full"></div>
+            </div>
+            <div className="text-center mt-1">+4</div>
+          </div>
+        );
       default:
         return card.value;
     }
   };
-
-  // Calculate stacking effect styles
-  const stackStyle: React.CSSProperties = stackPosition > 0 
-    ? {
-        position: 'absolute',
-        top: `-${stackPosition * 1}px`,
-        left: `${stackPosition * 0.5}px`,
-        zIndex: 10 - stackPosition,
-        ...style
-      }
-    : { ...style };
-
+  
   return (
-    <div
+    <div 
       className={cn(
-        'uno-card relative rounded-xl overflow-hidden',
+        "relative rounded-lg bg-gradient-to-br border-2 border-white shadow-md transition-transform",
+        colorClasses[card.color],
         sizeClasses[size],
-        isBack ? 'uno-card-back' : card ? getCardColorClass(card.color) : '',
-        isPlayable ? 'cursor-pointer hover:scale-110 hover:-translate-y-2 transition-transform' : '',
-        isPlayable && 'animate-pulse-subtle',
+        isPlayable ? "cursor-pointer hover:scale-110" : "",
+        isSelected ? "ring-4 ring-blue-400 transform scale-105 -translate-y-2" : "",
         className
       )}
-      onClick={isPlayable && onClick ? onClick : undefined}
-      style={stackStyle}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
     >
-      {!isBack && card && (
-        <>
-          <div className="absolute top-1 left-1 text-sm font-bold">{getCardSymbol(card)}</div>
-          <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
-            <div className="text-3xl font-bold transform -rotate-12 scale-150">
-              {getCardSymbol(card)}
-            </div>
-          </div>
-          <div className="absolute bottom-1 right-1 text-sm font-bold transform rotate-180">{getCardSymbol(card)}</div>
-          
-          {/* Card inner white oval */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3/4 h-2/3 bg-white/90 rounded-full -rotate-12 flex items-center justify-center">
-            <div className="text-4xl font-bold">
-              {getCardSymbol(card)}
-            </div>
-          </div>
-        </>
-      )}
+      <div className="absolute top-1 left-1">
+        <div className={cn("font-bold", cornerSize)}>{card.value}</div>
+      </div>
       
-      {isBack && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-red-700 to-red-900">
-          <div className="absolute inset-2 rounded-lg border-2 border-white/30"></div>
-          <div className="w-3/4 h-1/2 bg-white rounded-full -rotate-12 flex items-center justify-center shadow-inner">
-            <span className="text-3xl font-bold text-red-700">UNO</span>
+      <div className="h-full w-full flex items-center justify-center">
+        <div className={cn("font-bold", symbolSize)}>
+          {getSymbol()}
+        </div>
+      </div>
+      
+      <div className="absolute bottom-1 right-1 transform rotate-180">
+        <div className={cn("font-bold", cornerSize)}>{card.value}</div>
+      </div>
+      
+      {/* White center oval */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="bg-white/90 transform -rotate-12 rounded-full w-3/4 h-1/2 flex items-center justify-center">
+          <div className={cn("font-bold transform rotate-12", symbolSize, colorClasses[card.color].split(' ')[2])}>
+            {getSymbol()}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

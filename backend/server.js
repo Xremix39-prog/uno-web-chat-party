@@ -1,3 +1,7 @@
+
+// The server implementation is quite long, but we need to update it to support the new features
+// We'll focus on the key changes needed:
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -18,6 +22,11 @@ const io = new Server(server, {
 // Game state
 const rooms = new Map();
 const players = new Map();
+
+// Helper to generate a room code
+function generateRoomCode() {
+  return Math.random().toString(36).substr(2, 6).toUpperCase();
+}
 
 // Card definitions
 const colors = ['red', 'blue', 'green', 'yellow'];
@@ -114,14 +123,19 @@ io.on('connection', (socket) => {
       name: room.name,
       players: room.players.map(p => ({ id: p.id, name: p.name, cards: [], isHost: p.isHost, isCurrentTurn: p.id === room.players[room.currentPlayerIndex]?.id })),
       status: room.status,
-      currentPlayerId: room.players[room.currentPlayerIndex]?.id || null
+      currentPlayerId: room.players[room.currentPlayerIndex]?.id || null,
+      isPrivate: room.isPrivate,
+      code: room.isPrivate ? room.code : undefined,
+      isSinglePlayer: room.isSinglePlayer,
+      turnCount: room.turnCount || 0,
+      deckShuffleCount: room.deckShuffleCount || 0
     }));
     
     socket.emit('rooms', roomsList);
   });
   
   // Create a new room
-  socket.on('createRoom', ({ roomName, playerName }) => {
+  socket.on('createRoom', ({ roomName, playerName, isPrivate = false, isSinglePlayer = false }) => {
     const roomId = uuidv4();
     const playerId = socket.id;
     
@@ -143,7 +157,14 @@ io.on('connection', (socket) => {
       drawPile: [],
       discardPile: [],
       currentCard: null,
-      messages: []
+      messages: [],
+      isPrivate: isPrivate,
+      code: isPrivate ? generateRoomCode() : undefined,
+      isSinglePlayer: isSinglePlayer,
+      turnCount: 0,
+      startTime: null,
+      deckShuffleCount: 0,
+      winnerName: null
     };
     
     rooms.set(roomId, room);
@@ -157,7 +178,12 @@ io.on('connection', (socket) => {
       name: r.name,
       players: r.players.map(p => ({ id: p.id, name: p.name, cards: [], isHost: p.isHost, isCurrentTurn: p.id === r.players[r.currentPlayerIndex]?.id })),
       status: r.status,
-      currentPlayerId: r.players[r.currentPlayerIndex]?.id || null
+      currentPlayerId: r.players[r.currentPlayerIndex]?.id || null,
+      isPrivate: r.isPrivate,
+      code: undefined, // Don't broadcast private codes
+      isSinglePlayer: r.isSinglePlayer,
+      turnCount: r.turnCount || 0,
+      deckShuffleCount: r.deckShuffleCount || 0
     })));
     
     // Send room created event to the creator
@@ -172,16 +198,21 @@ io.on('connection', (socket) => {
         direction: room.direction,
         drawPile: [],
         discardPile: [],
+        isPrivate: room.isPrivate,
+        code: room.code,
+        isSinglePlayer: room.isSinglePlayer,
+        turnCount: room.turnCount,
+        deckShuffleCount: room.deckShuffleCount,
         winnerName: null
       },
       player
     });
     
-    console.log(`Room created: ${roomName} (${roomId}) by ${playerName}`);
+    console.log(`Room created: ${roomName} (${roomId}) by ${playerName} - ${isPrivate ? 'Private' : 'Public'}`);
   });
   
   // Join an existing room
-  socket.on('joinRoom', ({ roomId, playerName }) => {
+  socket.on('joinRoom', ({ roomId, playerName, code }) => {
     const room = rooms.get(roomId);
     
     if (!room) {
@@ -194,6 +225,11 @@ io.on('connection', (socket) => {
     
     if (room.players.length >= 4) {
       return socket.emit('error', { message: 'Room is full' });
+    }
+    
+    // Check room code if it's private
+    if (room.isPrivate && room.code !== code) {
+      return socket.emit('error', { message: 'Invalid room code' });
     }
     
     const playerId = socket.id;
@@ -222,6 +258,11 @@ io.on('connection', (socket) => {
       direction: room.direction,
       drawPile: [],
       discardPile: [],
+      isPrivate: room.isPrivate,
+      code: undefined, // Don't broadcast private codes in room updates
+      isSinglePlayer: room.isSinglePlayer,
+      turnCount: room.turnCount,
+      deckShuffleCount: room.deckShuffleCount,
       winnerName: null
     });
     
@@ -231,7 +272,12 @@ io.on('connection', (socket) => {
       name: r.name,
       players: r.players.map(p => ({ id: p.id, name: p.name, cards: [], isHost: p.isHost, isCurrentTurn: p.id === r.players[r.currentPlayerIndex]?.id })),
       status: r.status,
-      currentPlayerId: r.players[r.currentPlayerIndex]?.id || null
+      currentPlayerId: r.players[r.currentPlayerIndex]?.id || null,
+      isPrivate: r.isPrivate,
+      code: undefined, // Don't broadcast private codes
+      isSinglePlayer: r.isSinglePlayer,
+      turnCount: r.turnCount || 0,
+      deckShuffleCount: r.deckShuffleCount || 0
     })));
     
     // Send room joined event to the joiner
@@ -246,6 +292,11 @@ io.on('connection', (socket) => {
         direction: room.direction,
         drawPile: [],
         discardPile: [],
+        isPrivate: room.isPrivate,
+        code: room.code, // Send code only to the joiner
+        isSinglePlayer: room.isSinglePlayer,
+        turnCount: room.turnCount,
+        deckShuffleCount: room.deckShuffleCount,
         winnerName: null
       },
       player
@@ -288,6 +339,9 @@ io.on('connection', (socket) => {
     // Update game status
     room.status = 'playing';
     room.currentPlayerIndex = 0;
+    room.startTime = Date.now();
+    room.turnCount = 0;
+    room.deckShuffleCount = 0;
     
     // Notify all players
     const gameStartedData = {
@@ -306,6 +360,12 @@ io.on('connection', (socket) => {
       direction: room.direction,
       drawPile: room.drawPile.map(() => ({})), // Just send the count
       discardPile: room.discardPile,
+      isPrivate: room.isPrivate,
+      code: undefined, // Don't broadcast private codes in game updates
+      isSinglePlayer: room.isSinglePlayer,
+      turnCount: room.turnCount,
+      startTime: room.startTime,
+      deckShuffleCount: room.deckShuffleCount,
       winnerName: null
     };
     
@@ -321,7 +381,8 @@ io.on('connection', (socket) => {
             cards: p.id === player.id ? p.cards : [], // Only send cards to this specific player
             isHost: p.isHost,
             isCurrentTurn: room.currentPlayerIndex === room.players.indexOf(p)
-          }))
+          })),
+          code: player.id === room.players[0].id ? room.code : undefined // Only send code to host
         };
         playerSocket.emit('gameStarted', playerView);
       }
@@ -333,14 +394,19 @@ io.on('connection', (socket) => {
       name: r.name,
       players: r.players.map(p => ({ id: p.id, name: p.name, cards: [], isHost: p.isHost, isCurrentTurn: p.id === r.players[r.currentPlayerIndex]?.id })),
       status: r.status,
-      currentPlayerId: r.players[r.currentPlayerIndex]?.id || null
+      currentPlayerId: r.players[r.currentPlayerIndex]?.id || null,
+      isPrivate: r.isPrivate,
+      code: undefined, // Don't broadcast private codes
+      isSinglePlayer: r.isSinglePlayer,
+      turnCount: r.turnCount || 0,
+      deckShuffleCount: r.deckShuffleCount || 0
     })));
     
     console.log(`Game started in room ${room.name} (${roomId})`);
   });
   
-  // Play a card
-  socket.on('playCard', ({ roomId, playerId, cardId, chosenColor }) => {
+  // Play cards
+  socket.on('playCard', ({ roomId, playerId, cardIds, chosenColor }) => {
     const room = rooms.get(roomId);
     
     if (!room) {
@@ -360,7 +426,16 @@ io.on('connection', (socket) => {
       return socket.emit('error', { message: 'Not your turn' });
     }
     
+    // Process multiple cards if needed
+    if (!Array.isArray(cardIds) || cardIds.length === 0) {
+      return socket.emit('error', { message: 'No cards to play' });
+    }
+    
     const player = room.players[playerIndex];
+    
+    // For now, we'll just handle playing one card at a time
+    // TODO: Implement playing multiple cards with the same value
+    const cardId = cardIds[0];
     const cardIndex = player.cards.findIndex(c => c.id === cardId);
     
     if (cardIndex === -1) {
@@ -391,6 +466,9 @@ io.on('connection', (socket) => {
     room.discardPile.unshift(card);
     room.currentCard = card;
     
+    // Increment turn count
+    room.turnCount++;
+    
     // Check for win condition
     if (player.cards.length === 0) {
       room.status = 'finished';
@@ -419,6 +497,12 @@ io.on('connection', (socket) => {
             direction: room.direction,
             drawPile: room.drawPile.map(() => ({})),
             discardPile: room.discardPile,
+            isPrivate: room.isPrivate,
+            code: p.isHost ? room.code : undefined,
+            isSinglePlayer: room.isSinglePlayer,
+            turnCount: room.turnCount,
+            startTime: room.startTime,
+            deckShuffleCount: room.deckShuffleCount,
             winnerName: player.name
           });
         }
@@ -451,6 +535,7 @@ io.on('connection', (socket) => {
             const lastCard = room.discardPile.shift();
             room.drawPile = shuffleDeck(room.discardPile);
             room.discardPile = [lastCard];
+            room.deckShuffleCount++;
           }
           if (room.drawPile.length > 0) {
             nextPlayer.cards.push(room.drawPile.pop());
@@ -468,6 +553,7 @@ io.on('connection', (socket) => {
             const lastCard = room.discardPile.shift();
             room.drawPile = shuffleDeck(room.discardPile);
             room.discardPile = [lastCard];
+            room.deckShuffleCount++;
           }
           if (room.drawPile.length > 0) {
             wild4NextPlayer.cards.push(room.drawPile.pop());
@@ -510,6 +596,12 @@ io.on('connection', (socket) => {
           direction: room.direction,
           drawPile: room.drawPile.map(() => ({})),
           discardPile: room.discardPile,
+          isPrivate: room.isPrivate,
+          code: p.isHost ? room.code : undefined,
+          isSinglePlayer: room.isSinglePlayer,
+          turnCount: room.turnCount,
+          startTime: room.startTime,
+          deckShuffleCount: room.deckShuffleCount,
           winnerName: null
         });
       }
@@ -548,12 +640,16 @@ io.on('connection', (socket) => {
       // Shuffle the rest of the discard pile to create a new draw pile
       room.drawPile = shuffleDeck(room.discardPile);
       room.discardPile = [topCard];
+      room.deckShuffleCount++;
     }
     
     // Draw a card
     if (room.drawPile.length > 0) {
       const drawnCard = room.drawPile.pop();
       player.cards.push(drawnCard);
+      
+      // Increment turn count
+      room.turnCount++;
       
       // Check if drawn card can be played
       const canPlay = canPlayCard(drawnCard, room.currentCard);
@@ -586,6 +682,12 @@ io.on('connection', (socket) => {
             direction: room.direction,
             drawPile: room.drawPile.map(() => ({})),
             discardPile: room.discardPile,
+            isPrivate: room.isPrivate,
+            code: p.isHost ? room.code : undefined,
+            isSinglePlayer: room.isSinglePlayer,
+            turnCount: room.turnCount,
+            startTime: room.startTime,
+            deckShuffleCount: room.deckShuffleCount,
             winnerName: null
           });
         }
@@ -612,12 +714,23 @@ io.on('connection', (socket) => {
     
     const player = room.players[playerIndex];
     
+    // Prevent chat spam - check if last message from this player is the same
+    if (room.messages && room.messages.length > 0) {
+      const lastMessage = room.messages[room.messages.length - 1];
+      if (lastMessage.senderId === player.id && 
+          lastMessage.message === message && 
+          Date.now() - lastMessage.timestamp < 5000) {
+        return; // Ignore duplicate message within 5 seconds
+      }
+    }
+    
     const chatMessage = {
       id: `${roomId}_${uuidv4()}`,
       senderId: player.id,
       senderName: player.name,
       message,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      isRead: false
     };
     
     // Store message in room
@@ -628,6 +741,69 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('chatMessage', chatMessage);
     
     console.log(`Chat in room ${room.name}: ${player.name}: ${message}`);
+  });
+  
+  // Handle reconnection
+  socket.on('reconnect', ({ playerId }) => {
+    // Check if player exists in players map
+    const playerInfo = players.get(playerId);
+    if (!playerInfo) {
+      return socket.emit('error', { message: 'Player not found' });
+    }
+    
+    const roomId = playerInfo.roomId;
+    const room = rooms.get(roomId);
+    
+    if (!room) {
+      return socket.emit('error', { message: 'Room not found' });
+    }
+    
+    // Find player in room
+    const playerIndex = room.players.findIndex(p => p.id === playerId);
+    if (playerIndex === -1) {
+      return socket.emit('error', { message: 'Player not found in room' });
+    }
+    
+    // Update player's socket ID
+    const player = room.players[playerIndex];
+    player.socketId = socket.id;
+    
+    // Join room
+    socket.join(roomId);
+    
+    // Update player in players map
+    players.set(playerId, { roomId });
+    
+    // Send player and room data
+    socket.emit('reconnected', {
+      room: {
+        id: room.id,
+        name: room.name,
+        players: room.players.map(p => ({
+          id: p.id,
+          name: p.name,
+          cards: p.id === playerId ? p.cards : [], // Only send cards to this player
+          isHost: p.isHost,
+          isCurrentTurn: room.currentPlayerIndex === room.players.indexOf(p)
+        })),
+        status: room.status,
+        currentPlayerId: room.players[room.currentPlayerIndex]?.id || null,
+        currentCard: room.currentCard,
+        direction: room.direction,
+        drawPile: room.drawPile?.map(() => ({})) || [],
+        discardPile: room.discardPile || [],
+        isPrivate: room.isPrivate,
+        code: player.isHost ? room.code : undefined,
+        isSinglePlayer: room.isSinglePlayer,
+        turnCount: room.turnCount || 0,
+        startTime: room.startTime,
+        deckShuffleCount: room.deckShuffleCount || 0,
+        winnerName: room.winnerName
+      },
+      player
+    });
+    
+    console.log(`Player ${player.name} reconnected to room ${room.name}`);
   });
   
   // Leave room
@@ -714,6 +890,12 @@ io.on('connection', (socket) => {
             direction: room.direction,
             drawPile: room.drawPile ? room.drawPile.map(() => ({})) : [],
             discardPile: room.discardPile || [],
+            isPrivate: room.isPrivate,
+            code: p.isHost ? room.code : undefined,
+            isSinglePlayer: room.isSinglePlayer,
+            turnCount: room.turnCount || 0,
+            startTime: room.startTime,
+            deckShuffleCount: room.deckShuffleCount || 0,
             winnerName: room.winnerName
           });
         }
@@ -732,7 +914,12 @@ io.on('connection', (socket) => {
       name: r.name,
       players: r.players.map(p => ({ id: p.id, name: p.name, cards: [], isHost: p.isHost, isCurrentTurn: p.id === r.players[r.currentPlayerIndex]?.id })),
       status: r.status,
-      currentPlayerId: r.status === 'playing' ? r.players[r.currentPlayerIndex]?.id : null
+      currentPlayerId: r.status === 'playing' ? r.players[r.currentPlayerIndex]?.id : null,
+      isPrivate: r.isPrivate,
+      code: undefined, // Don't broadcast private codes
+      isSinglePlayer: r.isSinglePlayer,
+      turnCount: r.turnCount || 0,
+      deckShuffleCount: r.deckShuffleCount || 0
     })));
     
     console.log(`Player ${player.name} left room ${room.name}`);

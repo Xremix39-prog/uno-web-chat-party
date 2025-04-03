@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import socketService from '../services/socket';
 import { toast } from 'sonner';
 import {
@@ -24,15 +24,18 @@ interface GameContextProps {
   joinRoom: (payload: JoinRoomPayload) => void;
   leaveRoom: () => void;
   startGame: () => void;
-  playCard: (cardId: string, chosenColor?: CardColor) => void;
+  playCard: (cardIds: string | string[], chosenColor?: CardColor) => void;
   drawCard: () => void;
   sendChatMessage: (message: string) => void;
+  markChatMessagesAsRead: () => void;
+  toggleLeaderboard: () => void;
 }
 
 const initialGameState: GameState = {
   room: null,
   player: null,
-  chatMessages: []
+  chatMessages: [],
+  showLeaderboard: false
 };
 
 const GameContext = createContext<GameContextProps | undefined>(undefined);
@@ -42,6 +45,32 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [connectionAttempts, setConnectionAttempts] = useState<number>(0);
+  const [playerId, setPlayerId] = useState<string | null>(null);
+
+  // Function to mark all chat messages as read
+  const markChatMessagesAsRead = useCallback(() => {
+    setGameState(prev => ({
+      ...prev,
+      chatMessages: prev.chatMessages.map(msg => ({ ...msg, isRead: true }))
+    }));
+  }, []);
+
+  // Toggle leaderboard visibility
+  const toggleLeaderboard = useCallback(() => {
+    setGameState(prev => ({
+      ...prev,
+      showLeaderboard: !prev.showLeaderboard
+    }));
+  }, []);
+
+  // Store player ID in localStorage for reconnection
+  useEffect(() => {
+    const storedPlayerId = localStorage.getItem('unoPlayerId');
+    if (storedPlayerId) {
+      setPlayerId(storedPlayerId);
+    }
+  }, []);
 
   // Initialize socket connection
   useEffect(() => {
@@ -52,11 +81,29 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Get available rooms
         socketService.getRooms();
+        
+        // Try to reconnect if playerId exists
+        if (playerId) {
+          socketService.reconnect(playerId);
+        }
       } catch (error) {
         console.error('Socket connection error:', error);
-        toast.error('Failed to connect to game server');
+        
+        // Retry connection up to 3 times
+        if (connectionAttempts < 3) {
+          setConnectionAttempts(prev => prev + 1);
+          
+          setTimeout(() => {
+            initializeSocket();
+          }, 2000);
+        } else {
+          toast.error('Failed to connect to game server');
+          setIsLoading(false);
+        }
       } finally {
-        setIsLoading(false);
+        if (connectionAttempts >= 3) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -65,7 +112,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       socketService.disconnect();
     };
-  }, []);
+  }, [connectionAttempts, playerId]);
 
   // Socket event listeners
   useEffect(() => {
@@ -84,6 +131,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         player
       }));
       
+      // Store player ID for potential reconnection
+      localStorage.setItem('unoPlayerId', player.id);
+      setPlayerId(player.id);
+      
       toast.success('Room created successfully');
     });
 
@@ -94,6 +145,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         room,
         player
       }));
+      
+      // Store player ID for potential reconnection
+      localStorage.setItem('unoPlayerId', player.id);
+      setPlayerId(player.id);
       
       toast.success('Joined room successfully');
     });
@@ -175,13 +230,31 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
+    // Reconnection event
+    socketService.on('reconnected', ({ room, player }: { room: Room; player: Player }) => {
+      if (room && player) {
+        setGameState(prev => ({
+          ...prev,
+          room,
+          player
+        }));
+        toast.success('Reconnected to game!');
+      }
+    });
+
     // Chat message event
     socketService.on('chatMessage', (message: ChatMessage) => {
       setGameState(prev => {
         if (prev.room?.id === message.id.split('_')[0]) {
+          // Mark message as unread if it's not from current player
+          const isFromCurrentPlayer = message.senderId === prev.player?.id;
+          
           return {
             ...prev,
-            chatMessages: [...prev.chatMessages, message]
+            chatMessages: [
+              ...prev.chatMessages, 
+              { ...message, isRead: isFromCurrentPlayer }
+            ]
           };
         }
         
@@ -211,6 +284,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const leaveRoom = () => {
     if (gameState.room && gameState.player) {
       socketService.leaveRoom(gameState.room.id, gameState.player.id);
+      // Clear stored player ID
+      localStorage.removeItem('unoPlayerId');
+      setPlayerId(null);
     }
   };
 
@@ -220,12 +296,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const playCard = (cardId: string, chosenColor?: CardColor) => {
+  const playCard = (cardIds: string | string[], chosenColor?: CardColor) => {
     if (gameState.room && gameState.player) {
+      // Convert single cardId to array
+      const cardIdsArray = Array.isArray(cardIds) ? cardIds : [cardIds];
+      
       const payload: PlayCardPayload = {
         roomId: gameState.room.id,
         playerId: gameState.player.id,
-        cardId,
+        cardIds: cardIdsArray,
         chosenColor
       };
       
@@ -263,7 +342,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         startGame,
         playCard,
         drawCard,
-        sendChatMessage
+        sendChatMessage,
+        markChatMessagesAsRead,
+        toggleLeaderboard
       }}
     >
       {children}

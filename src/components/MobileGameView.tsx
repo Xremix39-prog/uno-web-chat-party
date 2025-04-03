@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import GameRoom from './GameRoom';
 import GameChat from './GameChat';
@@ -8,7 +8,22 @@ import { useGame } from '@/context/GameContext';
 
 const MobileGameView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('game');
-  const { gameState } = useGame();
+  const { gameState, markChatMessagesAsRead } = useGame();
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  
+  // Update unread count when messages change
+  useEffect(() => {
+    const unread = gameState.chatMessages.filter(msg => !msg.isRead).length;
+    setUnreadCount(unread);
+  }, [gameState.chatMessages]);
+  
+  // Mark messages as read when switching to chat tab
+  useEffect(() => {
+    if (activeTab === 'chat' && unreadCount > 0) {
+      markChatMessagesAsRead();
+      setUnreadCount(0);
+    }
+  }, [activeTab, unreadCount, markChatMessagesAsRead]);
   
   return (
     <div className="h-full flex flex-col">
@@ -20,7 +35,7 @@ const MobileGameView: React.FC = () => {
         <TabsContent value="game" className="flex-1 p-0 m-0">
           <GameRoom />
         </TabsContent>
-        <TabsContent value="chat" className="flex-1 p-2 m-0">
+        <TabsContent value="chat" className="flex-1 p-2 m-0 pb-16">
           <GameChat className="h-full" />
         </TabsContent>
         
@@ -32,9 +47,9 @@ const MobileGameView: React.FC = () => {
           <TabsTrigger value="chat" className="flex items-center justify-center gap-2 py-3">
             <MessageSquare size={16} />
             <span>Chat</span>
-            {gameState.chatMessages.length > 0 && (
+            {unreadCount > 0 && (
               <span className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs animate-pulse">
-                {gameState.chatMessages.length > 9 ? '9+' : gameState.chatMessages.length}
+                {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </TabsTrigger>

@@ -8,6 +8,7 @@ export interface Card {
   color: CardColor;
   type: CardType;
   value: CardValue;
+  selected?: boolean; // Added for card selection
 }
 
 export interface Player {
@@ -29,6 +30,11 @@ export interface Room {
   drawPile: Card[];
   discardPile: Card[];
   winnerName: string | null;
+  isPrivate: boolean; // Added for private rooms
+  code?: string; // Added for joining private rooms
+  turnCount: number; // Added for leaderboard
+  startTime?: number; // Added for tracking game time
+  deckShuffleCount: number; // Added for tracking deck shuffles
 }
 
 export interface ChatMessage {
@@ -37,28 +43,33 @@ export interface ChatMessage {
   senderName: string;
   message: string;
   timestamp: number;
+  isRead: boolean; // Added to track if message has been read
 }
 
 export interface GameState {
   room: Room | null;
   player: Player | null;
   chatMessages: ChatMessage[];
+  showLeaderboard: boolean; // Added for leaderboard visibility
 }
 
 export interface JoinRoomPayload {
   roomId: string;
   playerName: string;
+  code?: string; // Added for private rooms
 }
 
 export interface CreateRoomPayload {
   roomName: string;
   playerName: string;
+  isPrivate?: boolean; // Added for private rooms
+  isSinglePlayer?: boolean; // Added for single player mode
 }
 
 export interface PlayCardPayload {
   roomId: string;
   playerId: string;
-  cardId: string;
+  cardIds: string[]; // Changed to array for multiple card selection
   chosenColor?: CardColor;
 }
 
