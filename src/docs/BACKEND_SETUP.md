@@ -1,40 +1,61 @@
 
-# Backend WebSocket Setup
+# UNO Game Backend Setup
 
-This application requires a WebSocket backend server to function properly. Follow these steps to connect to your backend:
+This document explains how to set up and run the UNO game backend server.
+
+## Prerequisites
+
+- Node.js (v16 or higher)
+- npm or yarn
+
+## Installation
+
+1. Navigate to the `backend` folder in the project directory:
+```
+cd backend
+```
+
+2. Install the dependencies:
+```
+npm install
+```
+or
+```
+yarn install
+```
 
 ## Configuration
 
-1. Create a `.env.local` file in the root of your project (this file won't be committed to version control)
-2. Add the following environment variable:
+The server runs on port 3000 by default. You can change this by setting the `PORT` environment variable.
+
+## Running the Server
+
+Start the server with:
+```
+npm start
+```
+or
+```
+yarn start
+```
+
+The server will start on http://localhost:3000 (or the port you configured).
+
+## Connecting the Frontend
+
+The frontend will automatically connect to the backend at http://localhost:3000 unless you specify a different URL in the `.env.local` file:
 
 ```
 VITE_BACKEND_URL=http://your-backend-url:port
 ```
 
-For example:
+## Development
+
+If you want to run the server in development mode with automatic reloading:
 ```
-VITE_BACKEND_URL=http://localhost:3000
+npm run dev
 ```
-
-## Default Configuration
-
-If no backend URL is provided, the application will default to:
+or
 ```
-http://localhost:3000
+yarn dev
 ```
-
-## Backend Implementation Requirements
-
-Your backend should implement the following Socket.IO events:
-
-- `getRooms`: Returns a list of available game rooms
-- `createRoom`: Creates a new game room
-- `joinRoom`: Joins an existing game room
-- `leaveRoom`: Leaves a game room
-- `startGame`: Starts a game in a room
-- `playCard`: Plays a card from a player's hand
-- `drawCard`: Draws a card from the deck
-- `chatMessage`: Sends a chat message to a room
-
-Refer to the TypeScript types in `src/types/uno.ts` for the expected data formats.
