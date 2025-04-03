@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatMessage } from '@/types/uno';
 import { Send } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface GameChatProps {
   className?: string;
@@ -14,14 +15,22 @@ interface GameChatProps {
 const GameChat: React.FC<GameChatProps> = ({ className }) => {
   const { gameState, sendChatMessage } = useGame();
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-
+  const isMobile = useIsMobile();
+  
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (message.trim()) {
+    if (message.trim() && !isSubmitting) {
+      setIsSubmitting(true);
       sendChatMessage(message);
       setMessage('');
+      
+      // Prevent duplicate submissions by disabling for a short period
+      setTimeout(() => {
+        setIsSubmitting(false);
+      }, 500);
     }
   };
 
@@ -40,6 +49,23 @@ const GameChat: React.FC<GameChatProps> = ({ className }) => {
     return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
   };
 
+  // Create an array of deduplicated messages
+  const deduplicatedMessages = gameState.chatMessages.reduce<ChatMessage[]>((acc, current) => {
+    // Check if we already have a message with same sender, text and within 2 seconds
+    const isDuplicate = acc.some(
+      msg => 
+        msg.senderId === current.senderId && 
+        msg.message === current.message && 
+        Math.abs(msg.timestamp - current.timestamp) < 2000
+    );
+    
+    if (!isDuplicate) {
+      acc.push(current);
+    }
+    
+    return acc;
+  }, []);
+
   return (
     <div className={`flex flex-col h-full bg-white/50 backdrop-blur-sm rounded-md shadow-md ${className}`}>
       <div className="p-3 border-b font-semibold text-lg">
@@ -47,16 +73,16 @@ const GameChat: React.FC<GameChatProps> = ({ className }) => {
       </div>
       
       <ScrollArea ref={scrollAreaRef} className="flex-1 p-3">
-        {gameState.chatMessages.length === 0 ? (
+        {deduplicatedMessages.length === 0 ? (
           <div className="text-center text-gray-500 py-10">
             No messages yet. Be the first to say hello!
           </div>
         ) : (
           <div className="space-y-3">
-            {gameState.chatMessages.map((msg: ChatMessage) => (
+            {deduplicatedMessages.map((msg: ChatMessage) => (
               <div 
                 key={msg.id} 
-                className={`p-2 rounded-lg max-w-[80%] ${
+                className={`p-2 rounded-lg max-w-[80%] animate-fade-in ${
                   msg.senderId === gameState.player?.id 
                     ? 'ml-auto bg-blue-500 text-white' 
                     : 'bg-gray-200'
@@ -75,15 +101,23 @@ const GameChat: React.FC<GameChatProps> = ({ className }) => {
         )}
       </ScrollArea>
       
-      <form onSubmit={handleSendMessage} className="p-3 border-t flex gap-2">
+      <form 
+        onSubmit={handleSendMessage} 
+        className={`p-3 border-t flex gap-2 ${isMobile ? 'sticky bottom-0 bg-white z-10' : ''}`}
+      >
         <Input
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Type a message..."
           className="flex-1"
         />
-        <Button type="submit" size="icon" disabled={!message.trim()}>
-          <Send size={18} />
+        <Button 
+          type="submit" 
+          size="icon" 
+          disabled={!message.trim() || isSubmitting}
+          className="transition-all"
+        >
+          <Send size={18} className={isSubmitting ? "animate-pulse" : ""} />
         </Button>
       </form>
     </div>

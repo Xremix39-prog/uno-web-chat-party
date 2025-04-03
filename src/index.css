@@ -96,41 +96,99 @@
   }
 }
 
+@keyframes pulse-subtle {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes card-float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(1deg);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-card-float {
+  animation: card-float 3s ease-in-out infinite;
+}
+
 .uno-card {
-  @apply relative rounded-lg overflow-hidden flex items-center justify-center;
+  @apply relative rounded-xl overflow-hidden flex items-center justify-center;
   @apply shadow-lg transition-transform duration-300 transform;
+  width: 80px;
+  height: 120px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.uno-card-red {
+  @apply bg-gradient-to-br from-red-500 to-red-700 text-white;
+  border: 3px solid white;
+}
+
+.uno-card-blue {
+  @apply bg-gradient-to-br from-blue-500 to-blue-700 text-white;
+  border: 3px solid white;
+}
+
+.uno-card-green {
+  @apply bg-gradient-to-br from-green-500 to-green-700 text-white;
+  border: 3px solid white;
+}
+
+.uno-card-yellow {
+  @apply bg-gradient-to-br from-yellow-400 to-yellow-600 text-black;
+  border: 3px solid white;
+}
+
+.uno-card-wild {
+  @apply bg-gradient-to-br from-purple-500 to-blue-700 text-white;
+  border: 3px solid white;
+}
+
+.uno-card-back {
+  @apply bg-gradient-to-br from-red-700 to-red-900;
+  border: 3px solid white;
+  position: relative;
+}
+
+.card-stack {
+  position: relative;
   width: 80px;
   height: 120px;
 }
 
-.uno-card-red {
-  @apply bg-uno-red text-white;
-}
-
-.uno-card-blue {
-  @apply bg-uno-blue text-white;
-}
-
-.uno-card-green {
-  @apply bg-uno-green text-white;
-}
-
-.uno-card-yellow {
-  @apply bg-uno-yellow text-black;
-}
-
-.uno-card-wild {
-  @apply bg-uno-black text-white;
-}
-
-.uno-card-back {
-  @apply bg-uno-black;
-  background-image: linear-gradient(45deg, #D72600 25%, transparent 25%),
-    linear-gradient(-45deg, #D72600 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #D72600 75%),
-    linear-gradient(-45deg, transparent 75%, #D72600 75%);
-  background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+.card-stack .uno-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: all 0.2s ease-out;
 }
 
 @media (max-width: 640px) {
@@ -138,5 +196,10 @@
     width: 60px;
     height: 90px;
     font-size: 0.8rem;
+  }
+  
+  .card-stack {
+    width: 60px;
+    height: 90px;
   }
 }

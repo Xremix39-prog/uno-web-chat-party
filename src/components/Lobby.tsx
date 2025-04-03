@@ -7,15 +7,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Users, Plus, LogIn } from 'lucide-react';
+import { Users, Plus, LogIn, ArrowLeft } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
-const Lobby: React.FC = () => {
+interface LobbyProps {
+  isSinglePlayer?: boolean;
+}
+
+const Lobby: React.FC<LobbyProps> = ({ isSinglePlayer = false }) => {
   const { availableRooms, createRoom, joinRoom } = useGame();
   const [playerName, setPlayerName] = useState('');
   const [roomName, setRoomName] = useState('');
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
 
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +38,8 @@ const Lobby: React.FC = () => {
     
     createRoom({
       roomName: roomName.trim(),
-      playerName: playerName.trim()
+      playerName: playerName.trim(),
+      isSinglePlayer
     });
   };
 
@@ -48,14 +55,34 @@ const Lobby: React.FC = () => {
     });
   };
 
+  const goBack = () => {
+    navigate('/');
+  };
+
+  // Filter rooms based on game mode
+  const filteredRooms = isSinglePlayer 
+    ? availableRooms.filter(room => room.isSinglePlayer) 
+    : availableRooms.filter(room => !room.isSinglePlayer);
+
   return (
     <div className="w-full max-w-4xl mx-auto p-4">
+      <Button 
+        variant="ghost" 
+        className="mb-4 flex items-center gap-1 hover:bg-gray-100" 
+        onClick={goBack}
+      >
+        <ArrowLeft size={16} />
+        <span>Back to Home</span>
+      </Button>
+
       <div className="text-center mb-8">
         <h1 className="text-4xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-uno-red via-uno-blue to-uno-green bg-clip-text text-transparent">
-          UNO Online
+          {isSinglePlayer ? 'Single Player' : 'Multiplayer'}
         </h1>
         <p className="text-lg text-gray-600">
-          Join or create a room to start playing!
+          {isSinglePlayer 
+            ? 'Create a room to play against AI opponents' 
+            : 'Join or create a room to play with friends'}
         </p>
       </div>
       
@@ -70,67 +97,71 @@ const Lobby: React.FC = () => {
         />
       </div>
       
-      <Tabs defaultValue="join" className="w-full">
+      <Tabs defaultValue={isSinglePlayer ? "create" : "join"} className="w-full">
         <TabsList className="grid grid-cols-2 mb-4">
-          <TabsTrigger value="join" className="flex items-center gap-2">
-            <LogIn size={16} />
-            <span>Join Room</span>
-          </TabsTrigger>
-          <TabsTrigger value="create" className="flex items-center gap-2">
+          {!isSinglePlayer && (
+            <TabsTrigger value="join" className="flex items-center gap-2">
+              <LogIn size={16} />
+              <span>Join Room</span>
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="create" className="flex items-center gap-2" style={{gridColumn: isSinglePlayer ? 'span 2' : ''}}>
             <Plus size={16} />
             <span>Create Room</span>
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="join">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users size={20} />
-                <span>Available Rooms</span>
-              </CardTitle>
-              <CardDescription>
-                Select a room to join the game
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[300px] pr-4">
-                {availableRooms.length === 0 ? (
-                  <div className="text-center py-10 text-gray-500">
-                    No rooms available. Create one!
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {availableRooms.map((room) => (
-                      <div
-                        key={room.id}
-                        className="border rounded-lg p-4 flex justify-between items-center"
-                      >
-                        <div>
-                          <h3 className="font-medium">{room.name}</h3>
-                          <p className="text-sm text-gray-500">
-                            {room.players.length} / 4 players
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            Status: {room.status === 'waiting' ? 'Waiting for players' : 'Game in progress'}
-                          </p>
-                        </div>
-                        
-                        <Button
-                          onClick={() => handleJoinRoom(room.id)}
-                          disabled={room.status !== 'waiting' || room.players.length >= 4}
-                          size={isMobile ? "sm" : "default"}
+        {!isSinglePlayer && (
+          <TabsContent value="join">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users size={20} />
+                  <span>Available Rooms</span>
+                </CardTitle>
+                <CardDescription>
+                  Select a room to join the game
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[300px] pr-4">
+                  {filteredRooms.length === 0 ? (
+                    <div className="text-center py-10 text-gray-500">
+                      No rooms available. Create one!
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredRooms.map((room) => (
+                        <div
+                          key={room.id}
+                          className="border rounded-lg p-4 flex justify-between items-center"
                         >
-                          Join
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                          <div>
+                            <h3 className="font-medium">{room.name}</h3>
+                            <p className="text-sm text-gray-500">
+                              {room.players.length} / 4 players
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              Status: {room.status === 'waiting' ? 'Waiting for players' : 'Game in progress'}
+                            </p>
+                          </div>
+                          
+                          <Button
+                            onClick={() => handleJoinRoom(room.id)}
+                            disabled={room.status !== 'waiting' || room.players.length >= 4}
+                            size={isMobile ? "sm" : "default"}
+                          >
+                            Join
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
         
         <TabsContent value="create">
           <Card>
@@ -138,7 +169,9 @@ const Lobby: React.FC = () => {
               <CardHeader>
                 <CardTitle>Create a New Room</CardTitle>
                 <CardDescription>
-                  Set up a room for others to join
+                  {isSinglePlayer 
+                    ? 'Set up a room to play against AI opponents' 
+                    : 'Set up a room for others to join'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
