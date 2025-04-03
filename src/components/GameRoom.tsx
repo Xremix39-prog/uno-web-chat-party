@@ -53,6 +53,7 @@ const GameRoom: React.FC = () => {
       playCard(selectedCard.id, color);
       setSelectedCard(null);
     }
+    setIsColorPickerOpen(false);
   };
   
   const handleDrawCard = () => {
@@ -133,7 +134,7 @@ const GameRoom: React.FC = () => {
                       <UnoCard 
                         isBack
                         size="sm"
-                        className={p.isCurrentTurn ? 'ring-2 ring-yellow-400 animate-pulse' : ''}
+                        className={p.isCurrentTurn ? 'current-turn-pulse' : ''}
                       />
                     </div>
                   </div>
@@ -151,16 +152,18 @@ const GameRoom: React.FC = () => {
                 
                 <div className="text-center">
                   <div className="mb-1 text-sm">Draw Pile ({room.drawPile.length})</div>
-                  <div 
-                    className="relative cursor-pointer" 
-                    onClick={handleDrawCard}
-                  >
-                    <UnoCard 
-                      isBack
-                      className={isMyTurn ? 'hover:scale-110 transition-transform' : ''}
-                    />
+                  <div className="relative card-stack-container cursor-pointer" onClick={handleDrawCard}>
+                    {/* Generate stacked cards effect */}
+                    {[...Array(Math.min(5, room.drawPile.length))].map((_, index) => (
+                      <UnoCard 
+                        key={index}
+                        isBack
+                        stackIndex={4 - index}
+                        className={isMyTurn ? 'hover:scale-105 transition-transform' : ''}
+                      />
+                    ))}
                     {isMyTurn && (
-                      <div className="absolute -top-2 -right-2 bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
+                      <div className="absolute -top-2 -right-2 bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-xs z-20">
                         +
                       </div>
                     )}
@@ -174,7 +177,7 @@ const GameRoom: React.FC = () => {
                   <div className="flex justify-between items-center mb-2">
                     <div className="font-medium">Your Cards</div>
                     {isMyTurn && (
-                      <div className="text-sm bg-green-500 text-white px-2 py-1 rounded">
+                      <div className="text-sm bg-green-500 text-white px-2 py-1 rounded current-turn-pulse">
                         Your Turn
                       </div>
                     )}

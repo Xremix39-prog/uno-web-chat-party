@@ -10,6 +10,7 @@ interface UnoCardProps {
   isBack?: boolean;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
+  stackIndex?: number; // For stacking cards in a deck
 }
 
 const UnoCard: React.FC<UnoCardProps> = ({
@@ -19,6 +20,7 @@ const UnoCard: React.FC<UnoCardProps> = ({
   isBack = false,
   className,
   size = 'md',
+  stackIndex = 0,
 }) => {
   if (!card && !isBack) {
     return null;
@@ -64,6 +66,13 @@ const UnoCard: React.FC<UnoCardProps> = ({
     }
   };
 
+  // Calculate offset for stacked cards
+  const stackStyle = stackIndex > 0 ? {
+    marginTop: `-${stackIndex * 2}px`,
+    marginLeft: `${stackIndex * 0.5}px`,
+    zIndex: 10 - stackIndex,
+  } : {};
+
   return (
     <div
       className={cn(
@@ -71,16 +80,27 @@ const UnoCard: React.FC<UnoCardProps> = ({
         sizeClasses[size],
         isBack ? 'uno-card-back' : card ? getCardColorClass(card.color) : '',
         isPlayable ? 'cursor-pointer hover:scale-110 hover:-translate-y-2 transition-transform' : '',
+        stackIndex > 0 ? 'absolute' : '',
         className
       )}
+      style={stackStyle}
       onClick={isPlayable && onClick ? onClick : undefined}
     >
       {!isBack && card && (
         <>
-          <div className="absolute top-1 left-1 text-sm">{getCardSymbol(card)}</div>
-          <div className="text-3xl font-bold">{getCardSymbol(card)}</div>
-          <div className="absolute bottom-1 right-1 text-sm transform rotate-180">{getCardSymbol(card)}</div>
+          <div className="absolute top-1 left-1 text-sm font-bold">{getCardSymbol(card)}</div>
+          <div className="flex items-center justify-center h-full text-3xl font-bold relative">
+            <div className="card-symbol-large">{getCardSymbol(card)}</div>
+            {/* Add card circle background */}
+            <div className="absolute w-3/4 h-3/4 rounded-full bg-white/30 -z-10"></div>
+          </div>
+          <div className="absolute bottom-1 right-1 text-sm font-bold transform rotate-180">{getCardSymbol(card)}</div>
         </>
+      )}
+      {isBack && (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-white font-bold text-lg rotate-45">UNO</div>
+        </div>
       )}
     </div>
   );
