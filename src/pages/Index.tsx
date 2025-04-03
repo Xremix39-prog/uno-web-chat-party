@@ -1,13 +1,41 @@
-// Update this page (the content is just a fallback if you fail to update the page)
 
-const Index = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+import React from 'react';
+import { GameProvider, useGame } from '@/context/GameContext';
+import Lobby from '@/components/Lobby';
+import GameRoom from '@/components/GameRoom';
+import MobileGameView from '@/components/MobileGameView';
+import LoadingSpinner from '@/components/LoadingSpinner';
+import { useIsMobile } from '@/hooks/use-mobile';
+
+const GameComponent: React.FC = () => {
+  const { gameState, isLoading } = useGame();
+  const isMobile = useIsMobile();
+  
+  if (isLoading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center">
+        <LoadingSpinner size="lg" />
+        <p className="mt-4 text-lg">Connecting to game server...</p>
       </div>
-    </div>
+    );
+  }
+  
+  // Show lobby if not in a room
+  if (!gameState.room) {
+    return <Lobby />;
+  }
+  
+  // Show game room or mobile view based on screen size
+  return isMobile ? <MobileGameView /> : <GameRoom />;
+};
+
+const Index: React.FC = () => {
+  return (
+    <GameProvider>
+      <div className="min-h-screen overflow-hidden">
+        <GameComponent />
+      </div>
+    </GameProvider>
   );
 };
 

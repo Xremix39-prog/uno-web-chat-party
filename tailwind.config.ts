@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,15 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// UNO specific colors
+				uno: {
+					red: '#D72600',
+					yellow: '#FFC107',
+					green: '#379711',
+					blue: '#0956BF',
+					black: '#000000',
+					background: '#F8F9FA'
 				}
 			},
 			borderRadius: {
@@ -84,11 +94,27 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'card-play': {
+					'0%': { transform: 'translateY(0) rotate(0)' },
+					'50%': { transform: 'translateY(-20px) rotate(-5deg)' },
+					'100%': { transform: 'translateY(0) rotate(0)' }
+				},
+				'card-draw': {
+					'0%': { transform: 'scale(0.8)', opacity: '0' },
+					'100%': { transform: 'scale(1)', opacity: '1' }
+				},
+				'float': {
+					'0%, 100%': { transform: 'translateY(0)' },
+					'50%': { transform: 'translateY(-10px)' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'card-play': 'card-play 0.3s ease-in-out',
+				'card-draw': 'card-draw 0.3s ease-in-out',
+				'float': 'float 3s ease-in-out infinite'
 			}
 		}
 	},
