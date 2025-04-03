@@ -7,12 +7,15 @@ import {
   JoinRoomPayload, 
   CreateRoomPayload, 
   PlayCardPayload, 
-  ChatMessagePayload 
+  ChatMessagePayload,
+  CardColor,
+  CardType,
+  CardValue
 } from '../types/uno';
 
 // For development, we'll use a mock socket implementation that simulates a backend
 class MockSocket {
-  private listeners: Record<string, Function[]> = {};
+  private listeners: Record<string, Array<(...args: any[]) => void>> = {};
   private rooms: Room[] = [];
   private players: Player[] = [];
   private chatMessages: Record<string, ChatMessage[]> = {};
@@ -56,7 +59,7 @@ class MockSocket {
     });
   }
   
-  public on(event: string, callback: Function) {
+  public on(event: string, callback: (...args: any[]) => void) {
     if (!this.listeners[event]) {
       this.listeners[event] = [];
     }
@@ -637,7 +640,7 @@ class SocketService {
     this.socket.disconnect();
   }
   
-  public on(event: string, callback: Function): void {
+  public on(event: string, callback: (...args: any[]) => void): void {
     this.socket.on(event, callback);
   }
   
