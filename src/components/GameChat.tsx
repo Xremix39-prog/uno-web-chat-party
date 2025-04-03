@@ -14,28 +14,15 @@ interface GameChatProps {
 const GameChat: React.FC<GameChatProps> = ({ className }) => {
   const { gameState, sendChatMessage } = useGame();
   const [message, setMessage] = useState('');
-  const [lastSentMessage, setLastSentMessage] = useState('');
-  const [lastSentTime, setLastSentTime] = useState(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const trimmedMessage = message.trim();
-    
-    // Prevent empty messages
-    if (!trimmedMessage) return;
-    
-    // Prevent duplicate messages within 3 seconds
-    const currentTime = Date.now();
-    if (trimmedMessage === lastSentMessage && currentTime - lastSentTime < 3000) {
-      return;
+    if (message.trim()) {
+      sendChatMessage(message);
+      setMessage('');
     }
-    
-    sendChatMessage(trimmedMessage);
-    setLastSentMessage(trimmedMessage);
-    setLastSentTime(currentTime);
-    setMessage('');
   };
 
   // Scroll to bottom whenever messages change
@@ -54,8 +41,8 @@ const GameChat: React.FC<GameChatProps> = ({ className }) => {
   };
 
   return (
-    <div className={`flex flex-col h-full bg-white/70 backdrop-blur-sm rounded-md shadow-md ${className}`}>
-      <div className="p-3 border-b font-semibold text-lg bg-primary text-white rounded-t-md">
+    <div className={`flex flex-col h-full bg-white/50 backdrop-blur-sm rounded-md shadow-md ${className}`}>
+      <div className="p-3 border-b font-semibold text-lg">
         Chat
       </div>
       
@@ -73,7 +60,7 @@ const GameChat: React.FC<GameChatProps> = ({ className }) => {
                   msg.senderId === gameState.player?.id 
                     ? 'ml-auto bg-blue-500 text-white' 
                     : 'bg-gray-200'
-                } animate-fade-in`}
+                }`}
               >
                 <div className="text-xs font-semibold mb-1">
                   {msg.senderId === gameState.player?.id ? 'You' : msg.senderName}
@@ -88,7 +75,7 @@ const GameChat: React.FC<GameChatProps> = ({ className }) => {
         )}
       </ScrollArea>
       
-      <form onSubmit={handleSendMessage} className="p-3 border-t flex gap-2 bg-white/50">
+      <form onSubmit={handleSendMessage} className="p-3 border-t flex gap-2">
         <Input
           value={message}
           onChange={(e) => setMessage(e.target.value)}
